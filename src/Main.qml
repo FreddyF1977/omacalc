@@ -94,7 +94,17 @@ ApplicationWindow {
                 backend.pressKey("sign");
             } else if (event.text === "c" || event.text === "C") {
                 backend.pressKey("clear");
-            } else if (/^[0-9+\-*/%]$/.test(event.text)) {
+            } else if (event.key >= Qt.Key_0 && event.key <= Qt.Key_9) {
+                backend.pressKey(String.fromCharCode(event.key));
+            } else if (event.key === Qt.Key_Plus) {
+                backend.pressKey("+");
+            } else if (event.key === Qt.Key_Minus) {
+                backend.pressKey("-");
+            } else if (event.key === Qt.Key_Asterisk) {
+                backend.pressKey("*");
+            } else if (event.key === Qt.Key_Slash) {
+                backend.pressKey("/");
+            } else if (/^[+\-*/%]$/.test(event.text)) {
                 backend.pressKey(event.text);
             } else {
                 return;
