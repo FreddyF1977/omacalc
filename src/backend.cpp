@@ -5,7 +5,11 @@
 #include <QDir>
 #include <QFile>
 #include <QGuiApplication>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QLocale>
+#include <QProcess>
 #include <QRect>
 #include <QSettings>
 #include <QTextStream>
@@ -35,6 +39,63 @@ QString sealNumber(const QString &entry) {
         return QStringLiteral("0");
     return sealed;
 }
+
+bool queryHyprlandNumLockState(bool *numLockOn) {
+    if (qEnvironmentVariableIsEmpty("HYPRLAND_INSTANCE_SIGNATURE"))
+        return false;
+
+    QProcess process;
+    process.start(QStringLiteral("hyprctl"),
+                  {QStringLiteral("devices"), QStringLiteral("-j")});
+    if (!process.waitForStarted(250) || !process.waitForFinished(500)) {
+        process.kill();
+        process.waitForFinished();
+        qWarning() << "Could not query NumLock state from Hyprland:" << process.errorString();
+        return false;
+    }
+    if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
+        qWarning() << "Could not query NumLock state from Hyprland:"
+                   << process.readAllStandardError();
+        return false;
+    }
+
+    QJsonParseError parseError;
+    const QJsonDocument document =
+        QJsonDocument::fromJson(process.readAllStandardOutput(), &parseError);
+    if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+        qWarning() << "Could not parse Hyprland keyboard state:" << parseError.errorString();
+        return false;
+    }
+
+    bool hasFallbackState = false;
+    bool fallbackState = false;
+    bool fallbackConsistent = true;
+    const QJsonArray keyboards = document.object().value(QStringLiteral("keyboards")).toArray();
+    for (const QJsonValue &value : keyboards) {
+        const QJsonObject keyboard = value.toObject();
+        if (!keyboard.contains(QStringLiteral("numLock")))
+            continue;
+
+        const bool state = keyboard.value(QStringLiteral("numLock")).toBool();
+        if (keyboard.value(QStringLiteral("main")).toBool()) {
+            *numLockOn = state;
+            return true;
+        }
+        if (!hasFallbackState) {
+            fallbackState = state;
+            hasFallbackState = true;
+        } else if (fallbackState != state) {
+            fallbackConsistent = false;
+        }
+    }
+
+    if (hasFallbackState && fallbackConsistent) {
+        *numLockOn = fallbackState;
+        return true;
+    }
+    qWarning() << "Hyprland did not report an unambiguous NumLock state";
+    return false;
+}
 }
 
 Backend::Backend(QObject *parent) : QObject(parent) {
@@ -48,6 +109,20 @@ Backend::Backend(QObject *parent) : QObject(parent) {
         loadOmarchyTheme();
         watchOmarchyTheme();
     });
+}
+
+void Backend::refreshNumLockState() {
+    bool numLockOn = false;
+    if (!queryHyprlandNumLockState(&numLockOn) || m_numLockOn == numLockOn)
+        return;
+
+    m_numLockOn = numLockOn;
+    emit numLockOnChanged();
+}
+
+void Backend::toggleNumLockState() {
+    m_numLockOn = !m_numLockOn;
+    emit numLockOnChanged();
 }
 
 QString Backend::expression() const {

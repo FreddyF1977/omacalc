@@ -13,6 +13,14 @@ ApplicationWindow {
     visible: true
     title: "Omacalc"
 
+    onActiveChanged: {
+        if (active) {
+            face.forceActiveFocus();
+            backend.refreshNumLockState();
+            numLockRefreshTimer.restart();
+        }
+    }
+
     readonly property bool darkMode: backend.darkMode
     readonly property color pageColor: backend.themeBackground
     readonly property color inkColor: backend.themeForeground
@@ -35,6 +43,13 @@ ApplicationWindow {
                 win.height = Math.round(win.height * factor);
             }
         }
+    }
+
+    Timer {
+        id: numLockRefreshTimer
+        interval: 100
+        repeat: false
+        onTriggered: backend.refreshNumLockState()
     }
 
     function mixColors(base, tint, amount) {
@@ -77,9 +92,50 @@ ApplicationWindow {
         anchors.margins: win.scaledSize(20)
         focus: true
 
+        function keypadNavigationDigit(key) {
+            switch (key) {
+            case Qt.Key_Home: return "7";
+            case Qt.Key_Up: return "8";
+            case Qt.Key_PageUp: return "9";
+            case Qt.Key_Left: return "4";
+            case Qt.Key_Clear: return "5";
+            case Qt.Key_Right: return "6";
+            case Qt.Key_End: return "1";
+            case Qt.Key_Down: return "2";
+            case Qt.Key_PageDown: return "3";
+            case Qt.Key_Insert: return "0";
+            case Qt.Key_Delete: return ".";
+            default: return "";
+            }
+        }
+
         Keys.onPressed: function(event) {
             if (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))
                 return;
+
+            if (event.key === Qt.Key_NumLock) {
+                if (!event.isAutoRepeat) {
+                    backend.toggleNumLockState();
+                    numLockRefreshTimer.restart();
+                }
+                return;
+            }
+            var fromKeypad = (event.modifiers & Qt.KeypadModifier) !== 0;
+            if (fromKeypad)
+                backend.refreshNumLockState();
+            if (fromKeypad && !backend.numLockOn
+                    && ((event.key >= Qt.Key_0 && event.key <= Qt.Key_9)
+                        || event.text === "." || event.text === ",")) {
+                return;
+            }
+            if (backend.numLockOn && fromKeypad) {
+                var keypadValue = keypadNavigationDigit(event.key);
+                if (keypadValue !== "") {
+                    backend.pressKey(keypadValue);
+                    event.accepted = true;
+                    return;
+                }
+            }
 
             if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter
                     || event.text === "=") {
@@ -94,7 +150,17 @@ ApplicationWindow {
                 backend.pressKey("sign");
             } else if (event.text === "c" || event.text === "C") {
                 backend.pressKey("clear");
-            } else if (/^[0-9+\-*/%]$/.test(event.text)) {
+            } else if (event.key >= Qt.Key_0 && event.key <= Qt.Key_9) {
+                backend.pressKey(String.fromCharCode(event.key));
+            } else if (event.key === Qt.Key_Plus) {
+                backend.pressKey("+");
+            } else if (event.key === Qt.Key_Minus) {
+                backend.pressKey("-");
+            } else if (event.key === Qt.Key_Asterisk) {
+                backend.pressKey("*");
+            } else if (event.key === Qt.Key_Slash) {
+                backend.pressKey("/");
+            } else if (/^[+\-*/%]$/.test(event.text)) {
                 backend.pressKey(event.text);
             } else {
                 return;
@@ -234,6 +300,9 @@ ApplicationWindow {
             width = Math.round(400 * backend.textScale);
             height = Math.round(568 * backend.textScale);
         }
+        face.forceActiveFocus();
+        backend.refreshNumLockState();
+        numLockRefreshTimer.restart();
     }
 
     Component.onDestruction: backend.saveWindowGeometry(

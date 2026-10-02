@@ -16,6 +16,7 @@ class Backend : public QObject {
     Q_PROPERTY(QString themeForeground READ themeForeground NOTIFY themeColorsChanged)
     Q_PROPERTY(QString themeAccent READ themeAccent NOTIFY themeColorsChanged)
     Q_PROPERTY(QString themeSelection READ themeSelection NOTIFY themeColorsChanged)
+    Q_PROPERTY(bool numLockOn READ numLockOn NOTIFY numLockOnChanged)
 
 public:
     explicit Backend(QObject *parent = nullptr);
@@ -31,6 +32,7 @@ public:
     QString themeForeground() const { return m_themeForeground; }
     QString themeAccent() const { return m_themeAccent; }
     QString themeSelection() const { return m_themeSelection; }
+    bool numLockOn() const { return m_numLockOn; }
 
     static double evaluateTokens(const QStringList &tokens, bool *ok);
     static QString formatNumber(double value);
@@ -38,6 +40,8 @@ public:
     Q_INVOKABLE void pressKey(const QString &key);
     Q_INVOKABLE void copyResult() const;
     Q_INVOKABLE void pasteNumber();
+    Q_INVOKABLE void toggleNumLockState();
+    Q_INVOKABLE void refreshNumLockState();
     Q_INVOKABLE QVariantMap windowGeometry() const;
     Q_INVOKABLE void saveWindowGeometry(int x, int y, int width, int height, bool maximized);
 
@@ -46,6 +50,7 @@ signals:
     void darkModeChanged();
     void textScaleChanged();
     void themeColorsChanged();
+    void numLockOnChanged();
 
 private:
     void pressDigit(const QString &digit);
@@ -78,5 +83,6 @@ private:
     QString m_themeForeground;
     QString m_themeAccent;
     QString m_themeSelection;
+    bool m_numLockOn = false;
     QFileSystemWatcher m_themeWatcher;
 };

@@ -29,6 +29,17 @@ private slots:
         QCOMPARE(calculator.expression(), QString());
     }
 
+    void togglesNumLockState() {
+        Backend calculator;
+        QVERIFY(!calculator.numLockOn());
+
+        calculator.toggleNumLockState();
+        QVERIFY(calculator.numLockOn());
+
+        calculator.toggleNumLockState();
+        QVERIFY(!calculator.numLockOn());
+    }
+
     void calculatesWithPrecedence() {
         Backend calculator;
         press(calculator, "4 2 × 3 + 7 =");
